@@ -1,0 +1,531 @@
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+
+const app = express();
+app.use(express.json());
+app.use(cors());
+
+mongoose.connect("mongodb://127.0.0.1:27017/smm-panel");
+
+app.use("/api/auth", require("./routes/auth"));
+app.use("/api/order", require("./routes/order"));
+
+app.listen(5000, () => {
+  console.log("Server running on port 5000");
+});
+const mongoose = require("mongoose");
+
+const UserSchema = new mongoose.Schema({
+  username: String,
+  email: String,
+  password: String,
+  balance: { type: Number, default: 0 }
+});
+
+module.exports = mongoose.model("User", UserSchema);
+const mongoose = require("mongoose");
+
+const OrderSchema = new mongoose.Schema({
+  userId: String,
+  service: String,
+  link: String,
+  quantity: Number,
+  status: { type: String, default: "pending" },
+  date: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model("Order", OrderSchema);
+const router = require("express").Router();
+const User = require("../models/User");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+
+// Register
+router.post("/register", async (req, res) => {
+  const hashed = await bcrypt.hash(req.body.password, 10);
+  const user = new User({
+    username: req.body.username,
+    email: req.body.email,
+    password: hashed
+  });
+  await user.save();
+  res.json("User created");
+});
+
+// Login
+router.post("/login", async (req, res) => {
+  const user = await User.findOne({ email: req.body.email });
+  if (!user) return res.json("User not found");
+
+  const valid = await bcrypt.compare(req.body.password, user.password);
+  if (!valid) return res.json("Wrong password");
+
+  const token = jwt.sign({ id: user._id }, "SECRET_KEY");
+  res.json({ token });
+});
+
+module.exports = router;
+const router = require("express").Router();
+const Order = require("../models/Order");
+
+// create order
+router.post("/", async (req, res) => {
+  const order = new Order(req.body);
+  await order.save();
+  res.json(order);
+});
+
+// get orders
+router.get("/", async (req, res) => {
+  const orders = await Order.find();
+  res.json(orders);
+});
+
+module.exports = router;
+npm init -y
+npm install express mongoose cors bcrypt
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const bcrypt = require("bcrypt");
+
+const app = express();
+app.use(express.json());
+app.use(cors());
+
+// connect MongoDB
+mongoose.connect("mongodb://127.0.0.1:27017/smm_panel");
+
+// user schema
+const User = mongoose.model("User", {
+  email: String,
+  password: String
+});
+
+
+// REGISTER
+app.post("/register", async (req,res)=>{
+  const hashed = await bcrypt.hash(req.body.password, 10);
+
+  const user = new User({
+    email: req.body.email,
+    password: hashed
+  });
+
+  await user.save();
+  res.json({message:"Registered"});
+});
+
+
+// LOGIN
+app.post("/login", async (req,res)=>{
+  const user = await User.findOne({ email: req.body.email });
+
+  if(!user){
+    return res.json({message:"User not found"});
+  }
+
+  const match = await bcrypt.compare(req.body.password, user.password);
+
+  if(!match){
+    return res.json({message:"Wrong password"});
+  }
+
+  res.json({message:"Login success"});
+});
+
+
+app.listen(5000, ()=>{
+  console.log("Server running...");
+});
+npm install axios
+const express = require("express");
+const axios = require("axios");
+const app = express();
+
+app.use(express.json());
+
+// SMM API config
+const API_URL = "https://provider.com/api/v2";
+const API_KEY = "YOUR_API_KEY";
+
+// CREATE ORDER
+app.post("/order", async (req,res)=>{
+  const {service, link, quantity} = req.body;
+
+  try{
+    const response = await axios.post(API_URL, {
+      key: API_KEY,
+      action: "add",
+      service: service,
+      link: link,
+      quantity: quantity
+    });
+
+    res.json(response.data);
+
+  } catch(err){
+    res.json({error:"API failed"});
+  }
+});
+
+app.listen(5000, ()=>{
+  console.log("Server running...");
+});
+node server.js
+{
+  "order": 123456
+}
+const mongoose = require("mongoose");
+
+const Order = mongoose.model("Order", {
+  email: String,
+  service: String,
+  link: String,
+  quantity: Number,
+  orderId: String,
+  status: { type: String, default: "pending" },
+  date: { type: Date, default: Date.now }
+});
+app.post("/order", async (req,res)=>{
+  const {email, service, link, quantity} = req.body;
+
+  try{
+    // call SMM API
+    const apiRes = await axios.post(API_URL, {
+      key: API_KEY,
+      action: "add",
+      service,
+      link,
+      quantity
+    });
+
+    const orderId = apiRes.data.order;
+
+    // SAVE TO DATABASE
+    const newOrder = new Order({
+      email,
+      service,
+      link,
+      quantity,
+      orderId
+    });
+
+    await newOrder.save();
+
+    res.json({
+      message: "Order saved",
+      orderId: orderId
+    });
+
+  } catch(err){
+    res.json({error:"Order failed"});
+  }
+});
+app.get("/orders/:email", async (req,res)=>{
+  const orders = await Order.find({ email: req.params.email });
+  res.json(orders);
+});
+const User = mongoose.model("User", {
+  email: String,
+  password: String,
+  balance: { type: Number, default: 0 }
+});
+app.post("/add-balance", async (req,res)=>{
+  const {email, amount} = req.body;
+
+  const user = await User.findOne({ email });
+
+  if(!user){
+    return res.json({message:"User not found"});
+  }
+
+  user.balance += amount;
+  await user.save();
+
+  res.json({message:"Balance added", balance:user.balance});
+});
+app.post("/order", async (req,res)=>{
+  const {email, service, link, quantity} = req.body;
+
+  const user = await User.findOne({ email });
+
+  if(!user){
+    return res.json({message:"User not found"});
+  }
+
+  const price = quantity * 0.01; // example price
+
+  // CHECK BALANCE
+  if(user.balance < price){
+    return res.json({message:"Not enough balance"});
+  }
+
+  try{
+    const apiRes = await axios.post(API_URL, {
+      key: API_KEY,
+      action: "add",
+      service,
+      link,
+      quantity
+    });
+
+    const orderId = apiRes.data.order;
+
+    // deduct balance
+    user.balance -= price;
+    await user.save();
+
+    // save order
+    const newOrder = new Order({
+      email,
+      service,
+      link,
+      quantity,
+      orderId
+    });
+
+    await newOrder.save();
+
+    res.json({
+      message:"Order success",
+      orderId,
+      balance:user.balance
+    });
+
+  } catch(err){
+    res.json({message:"Order failed"});
+  }
+});
+app.get("/balance/:email", async (req,res)=>{
+  const user = await User.findOne({ email: req.params.email });
+  res.json({balance: user.balance});
+});
+alert("Order ID: " + data.orderId + " | Balance: $" + data.balance);
+app.get("/admin/users", async (req,res)=>{
+  const users = await User.find();
+  res.json(users);
+});
+app.get("/admin/orders", async (req,res)=>{
+  const orders = await Order.find();
+  res.json(orders);
+});
+app.post("/admin/add-balance", async (req,res)=>{
+  const {email, amount} = req.body;
+
+  const user = await User.findOne({ email });
+
+  if(!user){
+    return res.json({message:"User not found"});
+  }
+
+  user.balance += amount;
+  await user.save();
+
+  res.json({message:"Balance updated"});
+});
+const User = mongoose.model("User", {
+  email: String,
+  password: String,
+  balance: Number,
+  role: { type: String, default: "user" } // user or admin
+});
+app.post("/create-admin", async (req,res)=>{
+  const user = new User({
+    email: "admin@gmail.com",
+    password: "123456",
+    role: "admin",
+    balance: 0
+  });
+
+  await user.save();
+  res.json("Admin created");
+});
+app.post("/login", async (req,res)=>{
+  const user = await User.findOne({ email: req.body.email });
+
+  if(!user){
+    return res.json({message:"User not found"});
+  }
+
+  if(user.password !== req.body.password){
+    return res.json({message:"Wrong password"});
+  }
+
+  res.json({
+    message:"Login success",
+    role: user.role
+  });
+});
+function isAdmin(req,res,next){
+  if(req.headers.role !== "admin"){
+    return res.json({message:"Access denied"});
+  }
+  next();
+}
+app.get("/admin/users", isAdmin, async (req,res)=>{
+  const users = await User.find();
+  res.json(users);
+});
+const jwt = require("jsonwebtoken");
+
+const SECRET = "MY_SECRET_KEY";
+
+app.post("/login", async (req,res)=>{
+  const user = await User.findOne({ email: req.body.email });
+
+  if(!user){
+    return res.json({message:"User not found"});
+  }
+
+  if(user.password !== req.body.password){
+    return res.json({message:"Wrong password"});
+  }
+
+  // create token
+  const token = jwt.sign(
+    { email: user.email, role: user.role },
+    SECRET,
+    { expiresIn: "1h" }
+  );
+
+  res.json({
+    message:"Login success",
+    token
+  });
+});
+function auth(req,res,next){
+  const token = req.headers.authorization;
+
+  if(!token){
+    return res.json({message:"No token"});
+  }
+
+  try{
+    const decoded = jwt.verify(token, SECRET);
+    req.user = decoded;
+    next();
+  } catch(err){
+    res.json({message:"Invalid token"});
+  }
+}
+function isAdmin(req,res,next){
+  if(req.user.role !== "admin"){
+    return res.json({message:"Admin only"});
+  }
+  next();
+}
+app.get("/admin/users", auth, isAdmin, async (req,res)=>{
+  const users = await User.find();
+  res.json(users);
+});
+fetch("http://localhost:5000/admin/users", {
+  headers:{
+    "Authorization": localStorage.getItem("token")
+  }
+});
+mongodb+srv://user:pass@cluster.mongodb.net/smm_panel
+mongoose.connect("YOUR_MONGODB_URL");
+fetch("https://your-app.onrender.com/login", ...)
+const Payment = mongoose.model("Payment", {
+  email: String,
+  amount: Number,
+  image: String,
+  status: { type: String, default: "pending" },
+  date: { type: Date, default: Date.now }
+});
+app.post("/payment", async (req,res)=>{
+  const {email, amount, image} = req.body;
+
+  const payment = new Payment({
+    email,
+    amount,
+    image
+  });
+
+  await payment.save();
+
+  res.json({message:"Payment submitted"});
+});
+app.get("/admin/payments", async (req,res)=>{
+  const payments = await Payment.find();
+  res.json(payments);
+});
+app.post("/admin/approve", async (req,res)=>{
+  const {id} = req.body;
+
+  const payment = await Payment.findById(id);
+  payment.status = "approved";
+
+  const user = await User.findOne({ email: payment.email });
+  user.balance += payment.amount;
+
+  await payment.save();
+  await user.save();
+
+  res.json({message:"Payment approved"});
+});
+const axios = require("axios");
+
+const BOT_TOKEN = "YOUR_BOT_TOKEN";
+const CHAT_ID = "YOUR_CHAT_ID";
+
+function sendTelegram(message){
+  axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    params: {
+      chat_id: CHAT_ID,
+      text: message
+    }
+  });
+}
+app.post("/payment-auto", async (req,res)=>{
+  const {email, amount} = req.body;
+
+  const user = await User.findOne({ email });
+
+  if(!user){
+    return res.json({message:"User not found"});
+  }
+
+  user.balance += amount;
+  await user.save();
+
+  // notify admin
+  sendTelegram(`💰 New Deposit:
+User: ${email}
+Amount: $${amount}`);
+
+  res.json({message:"Payment auto approved"});
+});
+const Order = mongoose.model("Order", {
+  email: String,
+  service: String,
+  link: String,
+  quantity: Number,
+  orderId: String,
+  status: { type: String, default: "pending" }
+});
+async function checkStatus(orderId){
+  const res = await axios.post(API_URL, {
+    key: API_KEY,
+    action: "status",
+    order: orderId
+  });
+
+  return res.data.status; 
+}
+setInterval(async ()=>{
+  const orders = await Order.find({ status: "pending" });
+
+  for(let o of orders){
+    const newStatus = await checkStatus(o.orderId);
+
+    if(newStatus){
+      o.status = newStatus;
+      await o.save();
+    }
+  }
+
+  console.log("Orders updated...");
+}, 30000);

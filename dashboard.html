@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<h2>Dashboard</h2>
+
+<p id="user"></p>
+
+<input id="service" placeholder="Service ID">
+<br>
+<input id="link" placeholder="Link">
+<br>
+<input id="qty" placeholder="Quantity">
+<br><br>
+
+<button onclick="order()">Place Order</button>
+
+<button onclick="logout()">Logout</button>
+
+<hr>
+
+<h3>Orders</h3>
+<ul id="orders"></ul>
+
+<script>
+
+// show user
+document.getElementById("user").innerText =
+"User: " + localStorage.getItem("user");
+
+
+// ORDER FUNCTION
+async function order(){
+
+  if(!service.value || !link.value || !qty.value){
+    alert("Fill all fields");
+    return;
+  }
+
+  try {
+    const res = await fetch("http://localhost:5000/order", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email: localStorage.getItem("user"),
+        service: service.value,
+        link: link.value,
+        quantity: qty.value
+      })
+    });
+
+    const data = await res.json();
+    alert(data.message || "Order sent");
+
+    loadOrders();
+
+  } catch (err) {
+    alert("Server not running or wrong API");
+    console.log(err);
+  }
+}
+
+
+// LOAD ORDERS
+async function loadOrders(){
+  try {
+    const res = await fetch("http://localhost:5000/orders/" + localStorage.getItem("user"));
+    const data = await res.json();
+
+    let list = "";
+
+    data.forEach(o=>{
+      list += `<li>${o.service} | ${o.quantity} | ${o.status}</li>`;
+    });
+
+    document.getElementById("orders").innerHTML = list;
+
+  } catch (err) {
+    console.log(err);
+  }
+}
+
+
+// LOGOUT
+function logout(){
+  localStorage.removeItem("user");
+  window.location.href = "login.html";
+}
+
+// initial load
+loadOrders();
+
+</script>
+
+</body>
+</html>
